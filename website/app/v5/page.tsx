@@ -112,7 +112,6 @@ function CompanionIcon({ name }: { name: (typeof companionFeatures)[number]['ico
   if (name === 'sun') return <svg viewBox="0 0 48 48" aria-hidden="true"><rect {...common} x="7" y="9" width="34" height="30" rx="6" /><path {...common} d="m13 31 7-7 6 5 9-11" /></svg>;
   if (name === 'target') return <svg viewBox="0 0 48 48" aria-hidden="true"><path {...common} d="M10 12.5h28a4 4 0 0 1 4 4v15a4 4 0 0 1-4 4H23l-9 5v-5h-4a4 4 0 0 1-4-4v-15a4 4 0 0 1 4-4Z" /><path {...common} d="M17 24h.1M24 24h.1M31 24h.1" /></svg>;
   if (name === 'diary') return <svg viewBox="0 0 48 48" aria-hidden="true"><path {...common} d="M11 8h25a4 4 0 0 1 4 4v28H15a4 4 0 0 1-4-4V8Z" /><path {...common} d="M15 8v32M21 17h12M21 24h12M21 31h8" /></svg>;
-  if (name === 'chart') return <svg viewBox="0 0 48 48" aria-hidden="true"><path {...common} d="M24 42s13-10.4 13-22A13 13 0 0 0 11 20c0 11.6 13 22 13 22Z" /><circle {...common} cx="24" cy="20" r="4.5" /></svg>;
   return <svg viewBox="0 0 48 48" aria-hidden="true"><path {...common} d="M8 11v13.5L25.5 42 42 25.5 24.5 8H11a3 3 0 0 0-3 3Z" /><circle {...common} cx="17" cy="17" r="3" /></svg>;
 }
 
