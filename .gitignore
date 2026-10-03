@@ -1,0 +1,8 @@
+.tmp/
+.pnpm-store/
+website/node_modules/
+website/.vinext/
+website/dist/
+website/.next/
+website/.wrangler/
+website/tsconfig.tsbuildinfo
