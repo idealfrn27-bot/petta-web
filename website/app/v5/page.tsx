@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { siteConfig } from '../site-config';
 
 const productViews = [
@@ -30,7 +30,7 @@ const diaryScenes = [
     titleLines: ['今天过得怎么样，', '一眼就懂'],
     copy: '查看活动与休息状态，用一篇宠物日记，了解你不在身边时，它的一天。',
     facts: ['今日状态', '宠物日记'],
-    image: '/images/v5/diary-panels-v2/01-today-diary.png',
+    image: '/images/v5/diary-panels-v2/01-today-diary-clean-v3.png',
     alt: 'PETTA 今日状态与宠物日记未来交互概念图，展示佩戴概念项圈的犬只、今日状态卡片与宠物口吻日记',
   },
   {
@@ -48,7 +48,7 @@ const diaryScenes = [
     titleLines: ['多一点日常记录，', '更懂它一点'],
     copy: '回顾一周变化，补充吃饭、饮水与玩耍记录，再查看提醒，把数据与它的日常联系起来。',
     facts: ['每周回顾', '行为确认', '提醒记录'],
-    image: '/images/v5/diary-panels-v2/03-ui-overview.png',
+    image: '/images/v5/diary-panels-v2/03-ui-overview-golden-v2.png',
     alt: 'PETTA 三套未来交互界面组合图，依次展示一周回顾、行为确认与提醒记录',
   },
 ];
@@ -137,12 +137,10 @@ export default function V5Preview() {
   const [productVisible, setProductVisible] = useState(false);
   const productSectionRef = useRef<HTMLElement>(null);
   const productTrackRef = useRef<HTMLDivElement>(null);
-  const productDragRef = useRef({ active: false, startX: 0, scrollLeft: 0 });
-  const productMotionRef = useRef({ hover: false, focus: false, dragging: false, pausedUntil: 0, direction: 1 });
+  const productMotionRef = useRef({ hover: false, focus: false, pausedUntil: 0 });
   const logicRef = useRef<HTMLElement>(null);
   const diyIntroRef = useRef<HTMLElement>(null);
   const diyRef = useRef<HTMLElement>(null);
-  const diyTouchStartRef = useRef<number | null>(null);
   const visionRef = useRef<HTMLDivElement>(null);
   const visionSectionRef = useRef<HTMLElement>(null);
   const validationRef = useRef<HTMLElement>(null);
@@ -214,7 +212,7 @@ export default function V5Preview() {
     if (reduceMotion) return;
     const timer = window.setInterval(() => {
       const motion = productMotionRef.current;
-      if (!motion.focus && !motion.dragging && performance.now() > motion.pausedUntil) {
+      if (!motion.focus && !motion.hover && performance.now() > motion.pausedUntil) {
         setActiveProductView((current) => {
           const next = (current + 1) % productViews.length;
           const track = productTrackRef.current;
@@ -242,6 +240,29 @@ export default function V5Preview() {
     observer.observe(section);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const diary = document.querySelector<HTMLElement>('.v5-diary');
+    if (!diary || reduceMotion) return;
+    const panels = Array.from(diary.querySelectorAll<HTMLElement>('.v5-diary-panel'));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: '-10% 0px -14% 0px', threshold: 0.16 });
+
+    diary.classList.add('is-reveal-ready');
+    const frame = window.requestAnimationFrame(() => panels.forEach((panel) => observer.observe(panel)));
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      diary.classList.remove('is-reveal-ready');
+      panels.forEach((panel) => panel.classList.remove('is-visible'));
+    };
+  }, [reduceMotion]);
 
   useEffect(() => {
     const items = companionFeatureRefs.current.filter((item): item is HTMLElement => Boolean(item));
@@ -288,15 +309,6 @@ export default function V5Preview() {
           const distance = Math.max(1, rect.height - window.innerHeight);
           setDiyIntroProgress(Math.min(1, Math.max(0, -rect.top / distance)));
         }
-        const diySection = diyRef.current;
-        if (diySection && window.innerWidth > 720) {
-          const rect = diySection.getBoundingClientRect();
-          const distance = Math.max(1, rect.height - window.innerHeight);
-          const nextProgress = Math.min(1, Math.max(0, -rect.top / distance));
-          const nextDiyProgress = nextProgress * (diyOptions.length - 1);
-          setDiyProgress(nextDiyProgress);
-          setDiy(Math.min(diyOptions.length - 1, Math.round(nextDiyProgress)));
-        }
       });
     };
     update();
@@ -330,39 +342,6 @@ export default function V5Preview() {
     setActiveProductView(nearest);
   }
 
-  function scrollProductTrack(event: ReactWheelEvent<HTMLDivElement>) {
-    const track = event.currentTarget;
-    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-    const atStart = track.scrollLeft <= 1;
-    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
-    if ((delta < 0 && atStart) || (delta > 0 && atEnd)) return;
-    event.preventDefault();
-    productMotionRef.current.pausedUntil = performance.now() + 2400;
-    track.scrollLeft += delta * 0.72;
-  }
-
-  function startProductDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const track = event.currentTarget;
-    productDragRef.current = { active: true, startX: event.clientX, scrollLeft: track.scrollLeft };
-    productMotionRef.current.dragging = true;
-    track.setPointerCapture(event.pointerId);
-    track.dataset.dragging = 'true';
-  }
-
-  function moveProductDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!productDragRef.current.active) return;
-    event.currentTarget.scrollLeft = productDragRef.current.scrollLeft - (event.clientX - productDragRef.current.startX);
-  }
-
-  function endProductDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    productDragRef.current.active = false;
-    productMotionRef.current.dragging = false;
-    productMotionRef.current.pausedUntil = performance.now() + 2200;
-    delete event.currentTarget.dataset.dragging;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  }
-
   function scrollToLogicStep(index: number) {
     const section = logicRef.current;
     if (!section) return;
@@ -375,20 +354,6 @@ export default function V5Preview() {
     const next = Math.min(diyOptions.length - 1, Math.max(0, index));
     setDiy(next);
     setDiyProgress(next);
-    const section = diyRef.current;
-    if (!section || window.innerWidth <= 720) return;
-    const distance = Math.max(1, section.offsetHeight - window.innerHeight);
-    const stepProgress = next / Math.max(1, diyOptions.length - 1);
-    window.scrollTo({ top: section.offsetTop + distance * stepProgress, behavior: reduceMotion ? 'auto' : 'smooth' });
-  }
-
-  function finishDiySwipe(clientX: number) {
-    const start = diyTouchStartRef.current;
-    diyTouchStartRef.current = null;
-    if (start === null) return;
-    const delta = clientX - start;
-    if (Math.abs(delta) < 44) return;
-    selectDiy(diy + (delta < 0 ? 1 : -1));
   }
 
   function submitWaitlist(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSubmitted(true); }
@@ -441,11 +406,11 @@ export default function V5Preview() {
       </div>
     </section>
 
-    <section className="v5-statement" id="story"><h2><SectionTitle lines={['它不需要成为屏幕。', '它只需要自然地陪在身边。']} /></h2><div className="v5-statement-rule"><span /></div></section>
+    <section className="v5-statement" id="story"><h2><SectionTitle lines={['它不需要成为屏幕。', '它只需要自然地陪在身边。']} /></h2></section>
 
     <section className="v5-product-system" id="product" aria-labelledby="product-system-title" ref={productSectionRef}>
       <div className="v5-product-system-heading">
-        <p className="v5-kicker"><span /> COMPLETE PRODUCT · CONCEPT VIEW</p>
+        <p className="v5-kicker"><span /> PETTA PET COLLAR</p>
         <h2 id="product-system-title"><RevealText>PETTA 宠物项圈</RevealText></h2>
         <p>PETTA 正在探索从每只宠物自己的日常出发 让值得留意的变化拥有可以理解的参照</p>
       </div>
@@ -455,16 +420,11 @@ export default function V5Preview() {
         ref={productTrackRef}
         role="region"
         aria-roledescription="carousel"
-        aria-label="PETTA 宠物项圈三个概念视图 每三秒自动切换 也可拖动或使用左右方向键浏览"
+        aria-label="PETTA 宠物项圈三个概念视图 点击任意图片或使用左右方向键切换"
         tabIndex={0}
         onScroll={syncProductView}
-        onWheel={scrollProductTrack}
         onPointerEnter={() => { productMotionRef.current.hover = true; }}
         onPointerLeave={() => { productMotionRef.current.hover = false; productMotionRef.current.pausedUntil = performance.now() + 1200; }}
-        onPointerDown={startProductDrag}
-        onPointerMove={moveProductDrag}
-        onPointerUp={endProductDrag}
-        onPointerCancel={endProductDrag}
         onFocusCapture={() => { productMotionRef.current.focus = true; }}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) { productMotionRef.current.focus = false; productMotionRef.current.pausedUntil = performance.now() + 1200; } }}
         onKeyDown={(event) => {
@@ -472,16 +432,19 @@ export default function V5Preview() {
           if (event.key === 'ArrowLeft') { event.preventDefault(); selectProductView(activeProductView - 1); }
         }}
       >
-        {productViews.map((view, index) => <figure
+        {productViews.map((view, index) => <button
+            type="button"
             className={`v5-product-view ${activeProductView === index ? 'is-active' : ''}`}
             data-product-view={index}
-            aria-current={activeProductView === index ? 'true' : undefined}
+            aria-label={`显示${view.label}概念视图`}
+            aria-pressed={activeProductView === index}
+            onClick={() => selectProductView(index)}
             key={view.id}
           >
             <div className="v5-product-view-media">
               <img src={view.image} alt={view.alt} width="1600" height="900" loading={index === 0 ? 'eager' : 'lazy'} decoding="async" />
             </div>
-          </figure>)}
+          </button>)}
       </div>
 
       <div className="v5-product-dots" role="tablist" aria-label="选择产品概念视图">
@@ -594,13 +557,13 @@ export default function V5Preview() {
       </div>
     </section>
 
-    <section className="v5-diy" id="diy-collection" ref={diyRef} aria-labelledby="diy-title" tabIndex={0} style={{ '--diy-section-height': `${100 + (diyOptions.length - 1) * 58}svh` } as CSSProperties} onKeyDown={(event) => { if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); selectDiy(diy + 1); } if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); selectDiy(diy - 1); } }}>
+    <section className="v5-diy" id="diy-collection" ref={diyRef} aria-labelledby="diy-title" tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); selectDiy(diy + 1); } if (event.key === 'ArrowLeft') { event.preventDefault(); selectDiy(diy - 1); } }}>
       <div className="v5-diy-sticky">
         <div className="v5-diy-heading">
           <h2 className="v5-sr-only" id="diy-title">PETTA DIY 项圈系列</h2>
           <div className="v5-diy-series" role="tablist" aria-label="选择 DIY 项圈系列">{diySeries.map((series) => <button type="button" role="tab" aria-selected={diyOptions[diy].series === series.id} onClick={() => selectDiy(series.start)} key={series.id}><span>{series.meta}</span>{series.label}</button>)}</div>
         </div>
-        <div className="v5-diy-gallery" role="region" aria-roledescription="carousel" aria-label="完整 DIY 项圈款式；滚动页面、点击卡片或使用方向键切换" onTouchStart={(event) => { diyTouchStartRef.current = event.changedTouches[0]?.clientX ?? null; }} onTouchEnd={(event) => finishDiySwipe(event.changedTouches[0]?.clientX ?? 0)}>
+        <div className="v5-diy-gallery" id="diy-carousel" role="region" aria-roledescription="carousel" aria-label="完整 DIY 项圈款式；使用左右按钮、点击卡片或按左右方向键切换">
           <div className="v5-diy-cards">{diyOptions.map((option, index) => {
             const orbitOffset = index - diyProgress;
             const orbitAngle = orbitOffset * 0.72;
@@ -625,7 +588,13 @@ export default function V5Preview() {
           })}</div>
           <div className="v5-diy-caption" style={{ '--diy-caption-reveal': diyCaptionReveal, '--diy-caption-y': `${(1 - diyCaptionReveal) * 18}px` } as CSSProperties} aria-live="polite" aria-atomic="true"><p><span>{String(diy + 1).padStart(2, '0')}</span>{diyOptions[diy].seriesLabel} · {diyOptions[diy].season}</p><h3>{diyOptions[diy].label}</h3><p>{diyOptions[diy].copy}</p></div>
         </div>
-        <div className="v5-diy-footer"><a href="#waitlist" onClick={() => setSubmitted(false)}>保存这个偏好到 Waitlist <span aria-hidden="true">→</span></a></div>
+        <div className="v5-diy-footer">
+          <a href="#waitlist" onClick={() => setSubmitted(false)}>保存这个偏好到 Waitlist <span aria-hidden="true">→</span></a>
+          <div className="v5-diy-nav" aria-label="切换 DIY 项圈款式">
+            <button type="button" aria-label="上一款项圈" aria-controls="diy-carousel" disabled={diy === 0} onClick={() => selectDiy(diy - 1)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button>
+            <button type="button" aria-label="下一款项圈" aria-controls="diy-carousel" disabled={diy === diyOptions.length - 1} onClick={() => selectDiy(diy + 1)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6" /></svg></button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -655,6 +624,6 @@ export default function V5Preview() {
 
     <section className="v5-waitlist v5-shell" id="waitlist" aria-labelledby="waitlist-title"><div className="v5-waitlist-copy"><p className="v5-kicker"><span /> PETTA EARLY COMMUNITY</p><h2 id="waitlist-title"><SectionTitle lines={['加入 PETTA', '首批共创名单。']} /></h2><p>告诉我们你和宠物的真实需要。你的选择会帮助 PETTA 判断第一版应该优先完成什么。</p></div><div className="v5-form-panel">{submitted ? <div className="v5-success" role="status"><span aria-hidden="true">✓</span><h3>偏好预览已完成</h3><p>这个本地版本不会保存或发送你的信息。正式 Waitlist 开放后，你可以再次提交并加入共创名单。</p><button type="button" onClick={() => setSubmitted(false)}>返回表单</button></div> : <form onSubmit={submitWaitlist}><label>怎么称呼你？<input required name="name" autoComplete="name" placeholder="例如：Momo 的家人" /></label><label>联系方式<input required name="contact" autoComplete="email" placeholder="name@example.com" /></label><div className="v5-field-row"><label>你的伙伴<select name="pet" defaultValue="dog"><option value="dog">狗狗</option><option value="cat">猫咪</option><option value="both">猫狗都有</option></select></label><label>它的体型<select name="size" defaultValue="medium"><option value="small">小型</option><option value="medium">中型</option><option value="large">大型</option><option value="unknown">暂不确定</option></select></label></div><label>最期待的方向<select name="interest" defaultValue="diary"><option value="change">注意变化</option><option value="reassurance">离家时的安心感</option><option value="diary">宠物日记</option><option value="comfort">佩戴舒适</option><option value="diy">DIY 外观</option></select></label><div className="v5-field-row"><label>喜欢的 DIY 上盖<select name="diy" value={diy} onChange={(event) => setDiy(Number(event.target.value))}>{diyOptions.map((option, index) => <option value={index} key={option.src}>{option.label}</option>)}</select></label><label>可接受价格区间<select name="price" defaultValue="consider"><option value="consider">了解后再决定</option><option value="under500">500 元以内</option><option value="500to999">500–999 元</option><option value="over1000">1000 元以上</option></select></label></div><label>还有什么想告诉我们？<textarea name="message" rows={3} placeholder="佩戴、外观、宠物日记……" /></label><label className="v5-check"><input type="checkbox" name="interview" checked={interview} onChange={(event) => setInterview(event.target.checked)} />愿意参加后续访谈或试戴</label><button type="submit" className="v5-button">加入 Waitlist <span aria-hidden="true">→</span></button><small>当前为表单体验预览，暂不保存或发送信息。</small></form>}</div></section>
 
-    <footer className="v5-footer"><a className="v5-brand" href="#top" aria-label="返回 PETTA 首页"><BrandMark /></a><p>For every day. For every version of them.</p><p>{siteConfig.stage} · 猫狗通用是长期愿景，当前首轮工程验证以中型犬为主。</p><p>本网站展示的健康感知、状态说明与宠物日记均为研发方向或未来交互概念，不构成诊断或医疗建议，也不能替代专业兽医。</p><a href="#top">回到顶部 ↑</a></footer>
+    <footer className="v5-footer"><a className="v5-brand" href="#top" aria-label="返回 PETTA 首页"><BrandMark /></a><p>For every day. For every version of them.</p><p>本网站展示的健康感知、状态说明与宠物日记均为研发方向或未来交互概念，不构成诊断或医疗建议，也不能替代专业兽医。</p><a href="#top">回到顶部 ↑</a></footer>
   </main>;
 }
